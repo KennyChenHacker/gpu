@@ -1,134 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EXTREME MOBILE GPU STRESS</title>
-<style>
-    body { margin: 0; background: black; overflow: hidden; }
-    canvas { width: 100vw; height: 100vh; display: block; }
-    #warning {
-        position: fixed;
-        top: 10px; left: 10px; right: 10px;
-        padding: 10px;
-        background: rgba(0,0,0,0.8);
-        color: red;
-        border: 2px solid red;
-        font-weight: bold;
-        text-align: center;
-        z-index: 10;
-    }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU OVERLOAD</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        canvas { display: block; width: 100vw; height: 100vh; cursor: none; }
+        #warning {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 0, 60, 0.2); font-family: monospace;
+            font-size: 10vw; pointer-events: none;
+            white-space: nowrap; font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 
-<div id="warning">⚠️ EXTREME GPU STRESS TEST – CLOSE TAB IF DEVICE HEATS UP ⚠️</div>
-<canvas id="gl"></canvas>
+<div id="warning">MAX_LOAD</div>
+<canvas id="glCanvas"></canvas>
 
 <script>
-const canvas = document.getElementById("gl");
-const gl = canvas.getContext("webgl", { antialias: false, preserveDrawingBuffer: false });
+    const canvas = document.getElementById('glCanvas');
+    const gl = canvas.getContext('webgl');
 
-const vs = `
-attribute vec2 p;
-void main() { gl_Position = vec4(p,0.0,1.0); }
-`;
+    const vsSource = `attribute vec2 pos; void main() { gl_Position = vec4(pos, 0, 1); }`;
 
-const fs = `
-precision highp float;
-uniform float t;
-uniform vec2 r;
+    // FORCED MAXIMUM SETTINGS: 200 Fractal Iterations + 6x SSAA
+    const fsSource = `
+        precision highp float;
+        uniform float uTime;
+        uniform vec2 uRes;
 
-float map(vec3 p){
-    vec3 z = p;
-    float dr = 1.0;
-    float r0 = 0.0;
-    for(int i=0;i<250;i++){
-        r0 = length(z);
-        if(r0>4.0) break;
-        float th = acos(z.z/r0)*10.0 + t*0.1;
-        float ph = atan(z.y,z.x)*10.0;
-        dr = pow(r0,9.0)*9.0*dr + 1.0;
-        float zr = pow(r0,10.0);
-        z = zr * vec3(
-            sin(th)*cos(ph),
-            sin(ph)*sin(th),
-            cos(th)
-        ) + p;
-    }
-    return 0.5 * log(r0) * r0 / dr;
-}
-
-void main(){
-    vec3 col = vec3(0.0);
-    for(int x=0;x<8;x++){
-        for(int y=0;y<8;y++){
-            vec2 o = vec2(float(x),float(y))/8.0;
-            vec2 uv = (gl_FragCoord.xy+o-0.5*r)/r.y;
-            vec3 ro = vec3(4.0*cos(t*0.1),2.0,4.0*sin(t*0.1));
-            vec3 cw = normalize(-ro);
-            vec3 cu = normalize(cross(cw, vec3(0,1,0)));
-            vec3 cv = cross(cu,cw);
-            vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.5*cw);
-            float d = 0.0;
-            for(int i=0;i<220;i++){
-                float h = map(ro + rd*d);
-                if(h<0.00005 || d>15.0) break;
-                d += h;
+        float map(vec3 p) {
+            vec3 z = p;
+            float dr = 1.0, r = 0.0;
+            for (int i = 0; i < 200; i++) {
+                r = length(z);
+                if (r > 4.0) break;
+                float theta = acos(z.z/r) * 8.0 + uTime * 0.1;
+                float phi = atan(z.y, z.x) * 8.0;
+                dr = pow(r, 7.0) * 8.0 * dr + 1.0;
+                float zr = pow(r, 8.0);
+                z = zr * vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta)) + p;
             }
-            col += vec3(0.5+0.5*cos(t+d*2.0),0.2,0.3);
+            return 0.5 * log(r) * r / dr;
         }
+
+        void main() {
+            vec3 finalCol = vec3(0.0);
+            // Forced 6x6 sampling (36x load per pixel)
+            for(int m=0; m < 6; m++) {
+                for(int n=0; n < 6; n++) {
+                    vec2 offset = vec2(float(m), float(n)) / 6.0;
+                    vec2 uv = (gl_FragCoord.xy + offset - 0.5 * uRes.xy) / uRes.y;
+                    vec3 ro = vec3(3.0 * cos(uTime*0.1), 1.5, 3.0 * sin(uTime*0.1));
+                    vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
+                    vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.0*cw);
+                    
+                    float t = 0.0;
+                    for(int i=0; i<150; i++) {
+                        float h = map(ro + rd*t);
+                        if(h < 0.0001 || t > 10.0) break;
+                        t += h;
+                    }
+                    if(t < 10.0) {
+                        finalCol += vec3(0.9, 0.05, 0.15) * (1.0 - t/8.0);
+                    }
+                }
+            }
+            gl_FragColor = vec4(finalCol / 36.0, 1.0);
+        }
+    `;
+
+    function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        return s;
     }
-    gl_FragColor = vec4(col/64.0,1.0);
-}
-`;
 
-function compile(type, src){
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    return s;
-}
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    gl.useProgram(program);
 
-const program = gl.createProgram();
-gl.attachShader(program, compile(gl.VERTEX_SHADER, vs));
-gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fs));
-gl.linkProgram(program);
-gl.useProgram(program);
+    function render(now) {
+        now *= 0.001;
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        
+        const posLoc = gl.getAttribLocation(program, "pos");
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-
-const loc = gl.getAttribLocation(program, "p");
-gl.enableVertexAttribArray(loc);
-gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-
-const uT = gl.getUniformLocation(program,"t");
-const uR = gl.getUniformLocation(program,"r");
-
-function resize(){
-    const scale = 1.5;  // 🔥 increase this to 2.0 or 2.5 for more lag
-    canvas.width = innerWidth * scale;
-    canvas.height = innerHeight * scale;
-    gl.viewport(0,0,canvas.width,canvas.height);
-}
-window.onresize = resize;
-resize();
-
-function loop(time){
-    gl.uniform1f(uT, time*0.001);
-    gl.uniform2f(uR, canvas.width, canvas.height);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-// ESC key emergency exit
-window.addEventListener("keydown", e => {
-    if(e.key === "Escape") location.reload();
-});
+        gl.uniform1f(gl.getUniformLocation(program, "uTime"), now);
+        gl.uniform2f(gl.getUniformLocation(program, "uRes"), canvas.width, canvas.height);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
 </script>
-
 </body>
 </html>
