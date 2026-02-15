@@ -3,68 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>X-TREME GPU BENCHMARK</title>
+    <title>EXTREME GPU STRESS TEST</title>
     <style>
-        body { margin: 0; background: #000; color: #ff003c; font-family: 'Courier New', monospace; overflow: hidden; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; }
-        
-        #overlay {
-            position: absolute; top: 15px; left: 15px;
-            background: rgba(10, 0, 0, 0.85); padding: 20px;
-            border: 2px solid #ff003c; border-radius: 10px; pointer-events: none;
-            box-shadow: 0 0 15px rgba(255, 0, 60, 0.5);
-        }
-
-        .stat { font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-        #fps { color: #fff; font-weight: bold; font-size: 32px; text-shadow: 0 0 10px #ff003c; }
-        
-        .controls {
-            position: absolute; bottom: 30px; left: 50%;
-            transform: translateX(-50%); display: flex; gap: 15px;
-        }
-        button {
-            padding: 12px 24px; background: #000; color: #ff003c;
-            border: 2px solid #ff003c; cursor: pointer; font-family: inherit;
-            font-weight: bold; transition: all 0.2s;
-        }
-        button:hover { background: #ff003c; color: #000; }
-        button:active { transform: scale(0.9); }
-
         #warning {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: red; color: white; padding: 20px; display: none;
-            font-weight: bold; text-align: center; border: 5px white solid;
+            position: absolute; top: 20px; left: 20px;
+            color: #ff0000; background: rgba(0,0,0,0.8);
+            padding: 15px; border: 2px solid #ff0000;
+            font-weight: bold; pointer-events: none;
+            text-transform: uppercase; letter-spacing: 2px;
         }
     </style>
 </head>
 <body>
 
-<div id="overlay">
-    <div class="stat">System FPS: <span id="fps">--</span></div>
-    <div class="stat" id="load-text">TARGET: A19 PRO / DESKTOP GPU</div>
-    <div class="stat" id="res-text">RENDER: 4x SUPERSAMPLED</div>
-</div>
-
-<div id="warning">⚠️ THERMAL ALERT: DEVICE LAG DETECTED ⚠️</div>
-
-<div class="controls">
-    <button onclick="setIterations(16, 1)">LOW (A15)</button>
-    <button onclick="setIterations(64, 2)">MID (A18)</button>
-    <button onclick="setIterations(150, 4)">ULTRA (A19 PRO)</button>
-</div>
-
+<div id="warning">⚠️ EXTREME LOAD: GPU STRESS ACTIVE ⚠️</div>
 <canvas id="glCanvas"></canvas>
 
 <script>
     const canvas = document.getElementById('glCanvas');
     const gl = canvas.getContext('webgl');
-    const fpsDisplay = document.getElementById('fps');
-    const warning = document.getElementById('warning');
-    let program;
 
     const vsSource = `attribute vec2 pos; void main() { gl_Position = vec4(pos, 0, 1); }`;
 
-    const getFsSource = (iters, ssaa) => `
+    // The hardest possible logic: Raymarching + 6x SSAA + High Precision Normals
+    const fsSource = `
         precision highp float;
         uniform float uTime;
         uniform vec2 uRes;
@@ -72,10 +36,11 @@
         float map(vec3 p) {
             vec3 z = p;
             float dr = 1.0, r = 0.0;
-            for (int i = 0; i < ${iters}; i++) {
+            // 200 Iterations - significantly harder than the previous code
+            for (int i = 0; i < 200; i++) {
                 r = length(z);
                 if (r > 4.0) break;
-                float theta = acos(z.z/r) * 8.0 + uTime * 0.05;
+                float theta = acos(z.z/r) * 8.0 + uTime * 0.1;
                 float phi = atan(z.y, z.x) * 8.0;
                 dr = pow(r, 7.0) * 8.0 * dr + 1.0;
                 float zr = pow(r, 8.0);
@@ -84,70 +49,54 @@
             return 0.5 * log(r) * r / dr;
         }
 
-        vec3 getNormal(vec3 p) {
-            vec2 e = vec2(0.001, 0);
-            return normalize(vec3(map(p+e.xyy)-map(p-e.xyy), map(p+e.yxy)-map(p-e.yxy), map(p+e.yyx)-map(p-e.yyx)));
-        }
-
         void main() {
             vec3 finalCol = vec3(0.0);
-            float d_size = 1.0 / float(${ssaa});
             
-            // X-TREME: Supersampling Loop
-            for(int m=0; m < ${ssaa}; m++) {
-                vec2 uv = (gl_FragCoord.xy + vec2(float(m)*d_size) - 0.5 * uRes.xy) / uRes.y;
-                vec3 ro = vec3(3.0 * cos(uTime*0.2), 1.5, 3.0 * sin(uTime*0.2));
-                vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
-                vec3 rd = normalize(uv.x*cu + uv.y*cv + 1.8*cw);
-                
-                float t = 0.0;
-                for(int i=0; i<100; i++) {
-                    float h = map(ro + rd*t);
-                    if(h < 0.0005 || t > 8.0) break;
-                    t += h;
-                }
-                if(t < 8.0) {
-                    vec3 n = getNormal(ro + rd*t);
-                    float diff = max(dot(n, vec3(0.5, 1, 0.5)), 0.0);
-                    finalCol += vec3(0.8, 0.1, 0.2) * diff + 0.1;
+            // 6x6 Supersampling = 36x more calculations PER PIXEL
+            // This is what causes immediate lag on mobile GPUs
+            for(int m=0; m < 6; m++) {
+                for(int n=0; n < 6; n++) {
+                    vec2 offset = vec2(float(m), float(n)) / 6.0;
+                    vec2 uv = (gl_FragCoord.xy + offset - 0.5 * uRes.xy) / uRes.y;
+                    
+                    vec3 ro = vec3(3.5 * cos(uTime*0.1), 1.5, 3.5 * sin(uTime*0.1));
+                    vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
+                    vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.0*cw);
+                    
+                    float t = 0.0;
+                    for(int i=0; i<150; i++) {
+                        float h = map(ro + rd*t);
+                        if(h < 0.0001 || t > 10.0) break;
+                        t += h;
+                    }
+                    if(t < 10.0) {
+                        finalCol += vec3(0.5 + 0.5*cos(uTime+t*1.5), 0.1, 0.2);
+                    }
                 }
             }
-            gl_FragColor = vec4(finalCol / float(${ssaa}), 1.0);
+            gl_FragColor = vec4(finalCol / 36.0, 1.0);
         }
     `;
 
-    function initShader(iters, ssaa) {
-        const vs = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(vs, vsSource); gl.compileShader(vs);
-        const fs = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fs, getFsSource(iters, ssaa)); gl.compileShader(fs);
-        
-        program = gl.createProgram();
-        gl.attachShader(program, vs); gl.attachShader(program, fs);
-        gl.linkProgram(program);
-        gl.useProgram(program);
+    function createShader(gl, type, source) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, source); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(s));
+            return null;
+        }
+        return s;
     }
 
-    function setIterations(n, ssaa) {
-        initShader(n, ssaa);
-        document.getElementById('load-text').innerText = "LOAD: " + n + " Iters";
-        document.getElementById('res-text').innerText = "RENDER: " + ssaa + "x Supersampling";
-    }
+    const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    const program = gl.createProgram();
+    gl.attachShader(program, vs); gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    gl.useProgram(program);
 
-    let lastTime = 0, frameCount = 0;
     function render(now) {
         now *= 0.001;
-        const delta = now - lastTime;
-        frameCount++;
-
-        if (delta >= 1.0) {
-            let fps = Math.round(frameCount / delta);
-            fpsDisplay.innerText = fps;
-            warning.style.display = fps < 15 ? "block" : "none";
-            frameCount = 0;
-            lastTime = now;
-        }
-
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
         gl.viewport(0, 0, canvas.width, canvas.height);
         
@@ -163,8 +112,6 @@
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         requestAnimationFrame(render);
     }
-
-    initShader(64, 2); // Default to Mid
     requestAnimationFrame(render);
 </script>
 </body>
