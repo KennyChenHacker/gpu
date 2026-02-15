@@ -17,18 +17,6 @@
 
         .stat { font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         #fps { color: #fff; font-weight: bold; font-size: 32px; text-shadow: 0 0 10px #ff003c; }
-        
-        .controls {
-            position: absolute; bottom: 30px; left: 50%;
-            transform: translateX(-50%); display: flex; gap: 15px;
-        }
-        button {
-            padding: 12px 24px; background: #000; color: #ff003c;
-            border: 2px solid #ff003c; cursor: pointer; font-family: inherit;
-            font-weight: bold; transition: all 0.2s;
-        }
-        button:hover { background: #ff003c; color: #000; }
-        button:active { transform: scale(0.9); }
 
         #warning {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -42,16 +30,10 @@
 <div id="overlay">
     <div class="stat">System FPS: <span id="fps">--</span></div>
     <div class="stat" id="load-text">TARGET: A19 PRO / DESKTOP GPU</div>
-    <div class="stat" id="res-text">RENDER: 4x SUPERSAMPLED</div>
+    <div class="stat" id="res-text">RENDER: 9x SUPERSAMPLED (EXTREME)</div>
 </div>
 
 <div id="warning">⚠️ THERMAL ALERT: DEVICE LAG DETECTED ⚠️</div>
-
-<div class="controls">
-    <button onclick="setIterations(16, 1)">LOW (A15)</button>
-    <button onclick="setIterations(64, 2)">MID (A18)</button>
-    <button onclick="setIterations(150, 4)">ULTRA (A19 PRO)</button>
-</div>
 
 <canvas id="glCanvas"></canvas>
 
@@ -64,7 +46,12 @@
 
     const vsSource = `attribute vec2 pos; void main() { gl_Position = vec4(pos, 0, 1); }`;
 
-    const getFsSource = (iters, ssaa) => `
+    // A19 EXTREME SETTINGS (HARDER)
+    const ITERS = 260;   // fractal iterations (was max 150)
+    const SSAA  = 9;     // supersampling (was max 4)
+    const RM_STEPS = 180;
+
+    const fsSource = `
         precision highp float;
         uniform float uTime;
         uniform vec2 uRes;
@@ -72,13 +59,13 @@
         float map(vec3 p) {
             vec3 z = p;
             float dr = 1.0, r = 0.0;
-            for (int i = 0; i < ${iters}; i++) {
+            for (int i = 0; i < ${ITERS}; i++) {
                 r = length(z);
                 if (r > 4.0) break;
-                float theta = acos(z.z/r) * 8.0 + uTime * 0.05;
-                float phi = atan(z.y, z.x) * 8.0;
-                dr = pow(r, 7.0) * 8.0 * dr + 1.0;
-                float zr = pow(r, 8.0);
+                float theta = acos(z.z/r) * 9.0 + uTime * 0.08;
+                float phi = atan(z.y, z.x) * 9.0;
+                dr = pow(r, 8.0) * 9.0 * dr + 1.0;
+                float zr = pow(r, 9.0);
                 z = zr * vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta)) + p;
             }
             return 0.5 * log(r) * r / dr;
@@ -86,53 +73,50 @@
 
         vec3 getNormal(vec3 p) {
             vec2 e = vec2(0.001, 0);
-            return normalize(vec3(map(p+e.xyy)-map(p-e.xyy), map(p+e.yxy)-map(p-e.yxy), map(p+e.yyx)-map(p-e.yyx)));
+            return normalize(vec3(
+                map(p+e.xyy)-map(p-e.xyy),
+                map(p+e.yxy)-map(p-e.yxy),
+                map(p+e.yyx)-map(p-e.yyx)
+            ));
         }
 
         void main() {
             vec3 finalCol = vec3(0.0);
-            float d_size = 1.0 / float(${ssaa});
+            float d_size = 1.0 / float(${SSAA});
             
-            // X-TREME: Supersampling Loop
-            for(int m=0; m < ${ssaa}; m++) {
-                vec2 uv = (gl_FragCoord.xy + vec2(float(m)*d_size) - 0.5 * uRes.xy) / uRes.y;
-                vec3 ro = vec3(3.0 * cos(uTime*0.2), 1.5, 3.0 * sin(uTime*0.2));
-                vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
-                vec3 rd = normalize(uv.x*cu + uv.y*cv + 1.8*cw);
-                
-                float t = 0.0;
-                for(int i=0; i<100; i++) {
-                    float h = map(ro + rd*t);
-                    if(h < 0.0005 || t > 8.0) break;
-                    t += h;
-                }
-                if(t < 8.0) {
-                    vec3 n = getNormal(ro + rd*t);
-                    float diff = max(dot(n, vec3(0.5, 1, 0.5)), 0.0);
-                    finalCol += vec3(0.8, 0.1, 0.2) * diff + 0.1;
+            for(int m=0; m < ${SSAA}; m++) {
+                for(int n=0; n < ${SSAA}; n++) {
+                    vec2 uv = (gl_FragCoord.xy + vec2(float(m)*d_size, float(n)*d_size) - 0.5 * uRes.xy) / uRes.y;
+                    vec3 ro = vec3(3.2 * cos(uTime*0.25), 1.7, 3.2 * sin(uTime*0.25));
+                    vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
+                    vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.0*cw);
+                    
+                    float t = 0.0;
+                    for(int i=0; i<${RM_STEPS}; i++) {
+                        float h = map(ro + rd*t);
+                        if(h < 0.0003 || t > 10.0) break;
+                        t += h;
+                    }
+                    if(t < 10.0) {
+                        vec3 nrm = getNormal(ro + rd*t);
+                        float diff = max(dot(nrm, vec3(0.6, 1.0, 0.5)), 0.0);
+                        finalCol += vec3(0.9, 0.1, 0.2) * diff + 0.05;
+                    }
                 }
             }
-            gl_FragColor = vec4(finalCol / float(${ssaa}), 1.0);
+            gl_FragColor = vec4(finalCol / float(${SSAA * SSAA}), 1.0);
         }
     `;
 
-    function initShader(iters, ssaa) {
-        const vs = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(vs, vsSource); gl.compileShader(vs);
-        const fs = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fs, getFsSource(iters, ssaa)); gl.compileShader(fs);
-        
-        program = gl.createProgram();
-        gl.attachShader(program, vs); gl.attachShader(program, fs);
-        gl.linkProgram(program);
-        gl.useProgram(program);
-    }
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, vsSource); gl.compileShader(vs);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, fsSource); gl.compileShader(fs);
 
-    function setIterations(n, ssaa) {
-        initShader(n, ssaa);
-        document.getElementById('load-text').innerText = "LOAD: " + n + " Iters";
-        document.getElementById('res-text').innerText = "RENDER: " + ssaa + "x Supersampling";
-    }
+    program = gl.createProgram();
+    gl.attachShader(program, vs); gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    gl.useProgram(program);
 
     let lastTime = 0, frameCount = 0;
     function render(now) {
@@ -148,23 +132,28 @@
             lastTime = now;
         }
 
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
         gl.viewport(0, 0, canvas.width, canvas.height);
-        
+
         const posLoc = gl.getAttribLocation(program, "pos");
         const buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+            -1,-1, 1,-1, -1,1,
+            -1,1, 1,-1, 1,1
+        ]), gl.STATIC_DRAW);
+
         gl.enableVertexAttribArray(posLoc);
         gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
         gl.uniform1f(gl.getUniformLocation(program, "uTime"), now);
         gl.uniform2f(gl.getUniformLocation(program, "uRes"), canvas.width, canvas.height);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+
         requestAnimationFrame(render);
     }
 
-    initShader(64, 2); // Default to Mid
     requestAnimationFrame(render);
 </script>
 </body>
