@@ -1,109 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPU OVERLOAD</title>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        canvas { display: block; width: 100vw; height: 100vh; cursor: none; }
-        #warning {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255, 0, 60, 0.2); font-family: monospace;
-            font-size: 10vw; pointer-events: none;
-            white-space: nowrap; font-weight: bold;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X-TREME GPU BENCHMARK (ULTRA ONLY)</title>
+<style>
+    body { margin: 0; background: #000; color: #ff003c; font-family: 'Courier New', monospace; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    #overlay {
+        position: absolute; top: 15px; left: 15px;
+        background: rgba(10, 0, 0, 0.85); padding: 20px;
+        border: 2px solid #ff003c; border-radius: 10px; pointer-events: none;
+        box-shadow: 0 0 15px rgba(255, 0, 60, 0.5);
+    }
+
+    .stat { font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    #fps { color: #fff; font-weight: bold; font-size: 32px; text-shadow: 0 0 10px #ff003c; }
+
+    #warning {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: red; color: white; padding: 20px;
+        font-weight: bold; text-align: center; border: 5px white solid;
+        display: none;
+    }
+</style>
 </head>
 <body>
 
-<div id="warning">MAX_LOAD</div>
+<div id="overlay">
+    <div class="stat">SYSTEM FPS: <span id="fps">--</span></div>
+    <div class="stat">MODE: EXTREME ULTRA</div>
+    <div class="stat">LOAD: MAX GPU + SSAA</div>
+</div>
+
+<div id="warning">⚠️ THERMAL / PERFORMANCE LIMIT REACHED ⚠️</div>
+
 <canvas id="glCanvas"></canvas>
 
 <script>
-    const canvas = document.getElementById('glCanvas');
-    const gl = canvas.getContext('webgl');
+const canvas = document.getElementById('glCanvas');
+const gl = canvas.getContext('webgl', { antialias: false });
+const fpsDisplay = document.getElementById('fps');
+const warning = document.getElementById('warning');
 
-    const vsSource = `attribute vec2 pos; void main() { gl_Position = vec4(pos, 0, 1); }`;
+const vsSource = `attribute vec2 pos; void main(){ gl_Position = vec4(pos,0.0,1.0); }`;
 
-    // FORCED MAXIMUM SETTINGS: 200 Fractal Iterations + 6x SSAA
-    const fsSource = `
-        precision highp float;
-        uniform float uTime;
-        uniform vec2 uRes;
+const fsSource = `
+precision highp float;
+uniform float uTime;
+uniform vec2 uRes;
 
-        float map(vec3 p) {
-            vec3 z = p;
-            float dr = 1.0, r = 0.0;
-            for (int i = 0; i < 200; i++) {
-                r = length(z);
-                if (r > 4.0) break;
-                float theta = acos(z.z/r) * 8.0 + uTime * 0.1;
-                float phi = atan(z.y, z.x) * 8.0;
-                dr = pow(r, 7.0) * 8.0 * dr + 1.0;
-                float zr = pow(r, 8.0);
-                z = zr * vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta)) + p;
+float map(vec3 p) {
+    vec3 z = p;
+    float dr = 1.0, r = 0.0;
+    for (int i = 0; i < 220; i++) {
+        r = length(z);
+        if (r > 4.0) break;
+        float theta = acos(z.z/r) * 9.0 + uTime * 0.05;
+        float phi = atan(z.y, z.x) * 9.0;
+        dr = pow(r, 8.0) * 9.0 * dr + 1.0;
+        float zr = pow(r, 9.0);
+        z = zr * vec3(
+            sin(theta)*cos(phi),
+            sin(phi)*sin(theta),
+            cos(theta)
+        ) + p;
+    }
+    return 0.5 * log(r) * r / dr;
+}
+
+vec3 getNormal(vec3 p) {
+    vec2 e = vec2(0.001, 0.0);
+    return normalize(vec3(
+        map(p+e.xyy)-map(p-e.xyy),
+        map(p+e.yxy)-map(p-e.yxy),
+        map(p+e.yyx)-map(p-e.yyx)
+    ));
+}
+
+void main() {
+    vec3 finalCol = vec3(0.0);
+
+    // 9x SSAA = 81 samples per pixel (heavier than your ULTRA)
+    for(int x = 0; x < 9; x++) {
+        for(int y = 0; y < 9; y++) {
+            vec2 offset = vec2(float(x), float(y)) / 9.0;
+            vec2 uv = (gl_FragCoord.xy + offset - 0.5 * uRes.xy) / uRes.y;
+
+            vec3 ro = vec3(3.5*cos(uTime*0.2), 1.8, 3.5*sin(uTime*0.2));
+            vec3 cw = normalize(-ro);
+            vec3 cu = normalize(cross(cw, vec3(0,1,0)));
+            vec3 cv = cross(cu, cw);
+            vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.2*cw);
+
+            float t = 0.0;
+            for(int i = 0; i < 160; i++) {
+                float h = map(ro + rd*t);
+                if(h < 0.0004 || t > 10.0) break;
+                t += h;
             }
-            return 0.5 * log(r) * r / dr;
-        }
 
-        void main() {
-            vec3 finalCol = vec3(0.0);
-            // Forced 6x6 sampling (36x load per pixel)
-            for(int m=0; m < 6; m++) {
-                for(int n=0; n < 6; n++) {
-                    vec2 offset = vec2(float(m), float(n)) / 6.0;
-                    vec2 uv = (gl_FragCoord.xy + offset - 0.5 * uRes.xy) / uRes.y;
-                    vec3 ro = vec3(3.0 * cos(uTime*0.1), 1.5, 3.0 * sin(uTime*0.1));
-                    vec3 cw = normalize(-ro), cu = normalize(cross(cw, vec3(0,1,0))), cv = cross(cu, cw);
-                    vec3 rd = normalize(uv.x*cu + uv.y*cv + 2.0*cw);
-                    
-                    float t = 0.0;
-                    for(int i=0; i<150; i++) {
-                        float h = map(ro + rd*t);
-                        if(h < 0.0001 || t > 10.0) break;
-                        t += h;
-                    }
-                    if(t < 10.0) {
-                        finalCol += vec3(0.9, 0.05, 0.15) * (1.0 - t/8.0);
-                    }
-                }
+            if(t < 10.0) {
+                vec3 n = getNormal(ro + rd*t);
+                float diff = max(dot(n, normalize(vec3(0.6, 1.0, 0.4))), 0.0);
+                finalCol += vec3(0.9, 0.15, 0.25) * diff + 0.1;
             }
-            gl_FragColor = vec4(finalCol / 36.0, 1.0);
         }
-    `;
-
-    function compile(type, src) {
-        const s = gl.createShader(type);
-        gl.shaderSource(s, src); gl.compileShader(s);
-        return s;
     }
 
-    const program = gl.createProgram();
-    gl.attachShader(program, compile(gl.VERTEX_SHADER, vsSource));
-    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fsSource));
-    gl.linkProgram(program);
-    gl.useProgram(program);
+    gl_FragColor = vec4(finalCol / 81.0, 1.0);
+}
+`;
 
-    function render(now) {
-        now *= 0.001;
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        
-        const posLoc = gl.getAttribLocation(program, "pos");
-        const buf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(posLoc);
-        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-        gl.uniform1f(gl.getUniformLocation(program, "uTime"), now);
-        gl.uniform2f(gl.getUniformLocation(program, "uRes"), canvas.width, canvas.height);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        requestAnimationFrame(render);
+function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(s));
     }
+    return s;
+}
+
+const program = gl.createProgram();
+gl.attachShader(program, compile(gl.VERTEX_SHADER, vsSource));
+gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fsSource));
+gl.linkProgram(program);
+gl.useProgram(program);
+
+// One-time buffer setup (faster than recreating every frame)
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1,-1, 1,-1, -1,1,
+    -1,1,  1,-1, 1,1
+]), gl.STATIC_DRAW);
+
+const posLoc = gl.getAttribLocation(program, "pos");
+gl.enableVertexAttribArray(posLoc);
+gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+const uTime = gl.getUniformLocation(program, "uTime");
+const uRes  = gl.getUniformLocation(program, "uRes");
+
+function resize() {
+    const scale = 1.8;   // 🔥 increase to 2.2 for more lag on phones
+    canvas.width = innerWidth * scale;
+    canvas.height = innerHeight * scale;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.onresize = resize;
+resize();
+
+let last = 0, frames = 0;
+
+function render(now) {
+    now *= 0.001;
+    frames++;
+
+    if (now - last >= 1.0) {
+        const fps = Math.round(frames / (now - last));
+        fpsDisplay.textContent = fps;
+        warning.style.display = fps < 12 ? "block" : "none";
+        frames = 0;
+        last = now;
+    }
+
+    gl.uniform1f(uTime, now);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
 </script>
 </body>
 </html>
